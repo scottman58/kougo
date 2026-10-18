@@ -48,7 +48,8 @@ button:focus-visible, select:focus-visible { outline: 2px solid var(--ai); outli
 .settings { background: var(--card); border-bottom: 1px solid var(--line); padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; font-size: 13px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; padding: 4px 10px; background: transparent; }
+.seg button { border: 0; border-radius: 0; padding: 4px 9px; background: transparent; white-space: nowrap; }
+.row { white-space: nowrap; }
 .seg button[aria-pressed="true"] { background: var(--ai); color: var(--card); }
 main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 .card { max-width: 760px; margin: 0 auto; padding-block: 18px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 14px; font-size: var(--fs); }
@@ -108,6 +109,7 @@ footer button { flex: 1; max-width: 160px; padding: 9px; font-weight: 500; }
     <div class="row">振り仮名<span class="seg"><button id="bRubyOn">顯示</button><button id="bRubyOff">隱藏</button></span></div>
     <div class="row">現代語<span class="seg"><button id="bModOn">顯示</button><button id="bModOff">隱藏</button></span></div>
     <div class="row">詞彙・用法<span class="seg"><button id="bVocOn">顯示</button><button id="bVocOff">隱藏</button></span></div>
+    <div class="row">外觀<span class="seg"><button id="bThAuto">自動</button><button id="bThLight">淺色</button><button id="bThDark">深色</button></span></div>
     <div class="row">字體大小<span class="seg"><button id="bFsDn" aria-label="縮小">A−</button><button id="bFsUp" aria-label="放大">A＋</button></span></div>
   </div>
   <main id="main"><article class="card" id="card"></article></main>
@@ -127,11 +129,19 @@ const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','
 const ruby = s => esc(s).replace(/\{([^|}]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
 const ARROW = '<svg viewBox="0 0 9 12" aria-hidden="true"><path d="M4.5 1v9M1.2 7.2 4.5 10.6 7.8 7.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
 const KEY = 'kougo-reader-v1';
-let S = { b: BOOKS[0].id, pos: {}, i: 0, tate: true, ruby: true, mod: true, voc: true, fs: 17 };
+let S = { b: BOOKS[0].id, pos: {}, i: 0, theme: 'auto', tate: true, ruby: true, mod: true, voc: true, fs: 17 };
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (!S.pos) S.pos = {};
 if (S.pos.john === undefined && S.i) S.pos.john = S.i;
 if (!BOOKS.some(b => b.id === S.b)) S.b = BOOKS[0].id;
+const HOST_THEME = document.documentElement.getAttribute('data-theme');
+function applyTheme() {
+  const r = document.documentElement;
+  if (S.theme === 'light' || S.theme === 'dark') r.setAttribute('data-theme', S.theme);
+  else if (HOST_THEME) r.setAttribute('data-theme', HOST_THEME);
+  else r.removeAttribute('data-theme');
+  for (const [id, v] of [['bThAuto', 'auto'], ['bThLight', 'light'], ['bThDark', 'dark']]) $(id).setAttribute('aria-pressed', S.theme === v);
+}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 let groups = {};
@@ -204,6 +214,7 @@ $('bTate').onclick = set('tate', true); $('bYoko').onclick = set('tate', false);
 $('bRubyOn').onclick = set('ruby', true); $('bRubyOff').onclick = set('ruby', false);
 $('bModOn').onclick = set('mod', true); $('bModOff').onclick = set('mod', false);
 $('bVocOn').onclick = set('voc', true); $('bVocOff').onclick = set('voc', false);
+for (const [id, v] of [['bThAuto', 'auto'], ['bThLight', 'light'], ['bThDark', 'dark']]) $(id).onclick = () => { S.theme = v; applyTheme(); save(); };
 $('bFsDn').onclick = () => { S.fs = Math.max(13, S.fs - 1); render(); };
 $('bFsUp').onclick = () => { S.fs = Math.min(26, S.fs + 1); render(); };
 document.addEventListener('keydown', e => {
@@ -219,6 +230,7 @@ $('main').addEventListener('touchend', e => {
   if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
   tx = null;
 }, { passive: true });
+applyTheme();
 loadBook(S.b);
 </script>
 
