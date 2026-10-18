@@ -1,5 +1,5 @@
-const CACHE = 'kougo-v1';
-const FILES = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'kougo-v2';
+const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "books/john.json", "books/rom.json", "books/1co.json", "books/2co.json", "books/gal.json", "books/eph.json", "books/php.json", "books/col.json", "books/1th.json", "books/2th.json", "books/1ti.json", "books/2ti.json", "books/tit.json", "books/phm.json"];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
