@@ -70,6 +70,12 @@ main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-ove
 .vocab .w { font-family: var(--jp); color: var(--shu); font-weight: 600; }
 .note { display: flex; gap: 8px; align-items: flex-start; font-size: .86em; line-height: 1.7; background: var(--ai-soft); border-radius: 6px; padding: 8px 10px; }
 .note .tag { background: var(--ai); color: var(--card); border-radius: 3px; padding: 0 6px; font-size: .85em; flex: none; margin-top: .2em; }
+.modbox { background: var(--mod-bg); border-radius: 6px; display: flex; flex-direction: column; }
+.modbox .mod { background: transparent; }
+.mchunks { border-block: 0; border-top: 1px dashed var(--line); padding: 8px 10px 10px; margin: 0; }
+.mchunks .ck .j { background: var(--card); border-color: var(--mod-fg); color: var(--mod-fg); }
+.nomod .modbox { display: none; }
+.tate .mchunks { border-top: 0; border-left: 1px dashed var(--line); padding: 10px 8px; }
 .noruby rt { display: none; }
 [hidden] { display: none !important; }
 .nomod .mod, .novocab .vocab, .novocab .note { display: none; }
@@ -187,7 +193,7 @@ function render() {
     <div class="ref"><b>${refHtml}</b><span>${esc(DATA.short)}</span></div>
     <p class="tr">${esc(v.t)}</p>
     <p class="orig">${ruby(v.c.map(x => x[0]).join(''))}</p>
-    ${v.m ? `<p class="mod"><span class="lbl">現代語</span>${ruby(v.m)}</p>` : ''}
+    ${v.m ? `<div class="modbox"><p class="mod"><span class="lbl">現代語</span>${ruby(v.m)}</p>${v.mc ? `<div class="chunks mchunks">${v.mc.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>` : ''}</div>` : ''}
     <div class="chunks">${v.c.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>
     <ul class="vocab">${v.v.map(([w, d]) => `<li><span class="w">${esc(w)}</span>…${esc(d)}</li>`).join('')}</ul>
     ${v.n ? `<div class="note"><span class="tag">用法</span><span>${esc(v.n)}</span></div>` : ''}`;
