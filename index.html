@@ -76,6 +76,11 @@ main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-ove
 .mchunks .ck .j { background: var(--card); border-color: var(--mod-fg); color: var(--mod-fg); }
 .nomod .modbox { display: none; }
 .tate .mchunks { border-top: 0; border-left: 1px dashed var(--line); padding: 10px 8px; }
+.play { font: inherit; font-size: .8em; line-height: 1; border: 1px solid var(--line); background: var(--card); color: var(--ai); border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.play[aria-pressed="true"] { background: var(--ai); color: var(--card); border-color: var(--ai); }
+.play svg { width: 10px; height: 10px; }
+.origrow { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.tate .play { padding: 10px 4px; }
 .noruby rt { display: none; }
 [hidden] { display: none !important; }
 .nomod .mod, .novocab .vocab, .novocab .note { display: none; }
@@ -117,6 +122,7 @@ footer button { flex: 1; max-width: 160px; padding: 9px; font-weight: 500; }
     <div class="row">現代語<span class="seg"><button id="bModOn">顯示</button><button id="bModOff">隱藏</button></span></div>
     <div class="row">詞彙・用法<span class="seg"><button id="bVocOn">顯示</button><button id="bVocOff">隱藏</button></span></div>
     <div class="row">外觀<span class="seg"><button id="bThAuto">自動</button><button id="bThLight">淺色</button><button id="bThDark">深色</button></span></div>
+    <div class="row">朗讀速度<span class="seg"><button id="bR06">慢</button><button id="bR08">中</button><button id="bR10">一般</button></span></div>
     <div class="row">字體大小<span class="seg"><button id="bFsDn" aria-label="縮小">A−</button><button id="bFsUp" aria-label="放大">A＋</button></span></div>
   </div>
   <main id="main"><article class="card" id="card"></article></main>
@@ -136,7 +142,7 @@ const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','
 const ruby = s => esc(s).replace(/\{([^|}]+)\|([^}]+)\}/g, '<ruby>$1<rt>$2</rt></ruby>');
 const ARROW = '<svg viewBox="0 0 9 12" aria-hidden="true"><path d="M4.5 1v9M1.2 7.2 4.5 10.6 7.8 7.2" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>';
 const KEY = 'kougo-reader-v1';
-let S = { b: BOOKS[0].id, pos: {}, i: 0, theme: 'auto', tate: true, ruby: true, mod: true, voc: true, fs: 17 };
+let S = { b: BOOKS[0].id, pos: {}, i: 0, theme: 'auto', tate: true, ruby: true, mod: true, voc: true, fs: 17, rate: 0.8 };
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
 if (!S.pos) S.pos = {};
 if (S.pos.john === undefined && S.i) S.pos.john = S.i;
@@ -192,8 +198,8 @@ function render() {
   $('card').innerHTML = `
     <div class="ref"><b>${refHtml}</b><span>${esc(DATA.short)}</span></div>
     <p class="tr">${esc(v.t)}</p>
-    <p class="orig">${ruby(v.c.map(x => x[0]).join(''))}</p>
-    ${v.m ? `<div class="modbox"><p class="mod"><span class="lbl">現代語</span>${ruby(v.m)}</p>${v.mc ? `<div class="chunks mchunks">${v.mc.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>` : ''}</div>` : ''}
+    <div class="origrow"><button class="play" data-say="o" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 L9 5 L2 9 Z" fill="currentColor"/></svg>朗讀</button><p class="orig">${ruby(v.c.map(x => x[0]).join(''))}</p></div>
+    ${v.m ? `<div class="modbox"><p class="mod"><span class="lbl">現代語</span>${ruby(v.m)} <button class="play" data-say="m" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 L9 5 L2 9 Z" fill="currentColor"/></svg>朗讀</button></p>${v.mc ? `<div class="chunks mchunks">${v.mc.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>` : ''}</div>` : ''}
     <div class="chunks">${v.c.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>
     <ul class="vocab">${v.v.map(([w, d]) => `<li><span class="w">${esc(w)}</span>…${esc(d)}</li>`).join('')}</ul>
     ${v.n ? `<div class="note"><span class="tag">用法</span><span>${esc(v.n)}</span></div>` : ''}`;
@@ -203,7 +209,7 @@ function render() {
   app.classList.toggle('nomod', !S.mod);
   app.classList.toggle('novocab', !S.voc);
   document.documentElement.style.setProperty('--fs', S.fs + 'px');
-  const pairs = { bTate: S.tate, bYoko: !S.tate, bRubyOn: S.ruby, bRubyOff: !S.ruby, bModOn: S.mod, bModOff: !S.mod, bVocOn: S.voc, bVocOff: !S.voc };
+  const pairs = { bR06: S.rate === 0.6, bR08: (S.rate || 0.8) === 0.8, bR10: S.rate === 1.0, bTate: S.tate, bYoko: !S.tate, bRubyOn: S.ruby, bRubyOff: !S.ruby, bModOn: S.mod, bModOff: !S.mod, bVocOn: S.voc, bVocOff: !S.voc };
   for (const k in pairs) $(k).setAttribute('aria-pressed', pairs[k]);
   if ($('selC').value !== c || !$('selV').querySelector(`option[value="${S.i}"]`)) { $('selC').value = c; fillVerses(c); }
   $('selV').value = S.i;
@@ -214,7 +220,31 @@ function render() {
   S.pos[S.b] = S.i;
   save();
 }
-const go = d => { if (!V.length) return; S.i += d; render(); };
+
+const plain = s => s.replace(/\{([^|}]+)\|[^}]+\}/g, '$1').replace(/[「」『』（）()〔〕\[\]]/g, '');
+let jaVoice = null;
+function pickVoice() {
+  try {
+    const vs = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
+    jaVoice = vs.find(v => /Kyoko|Otoya|Google|Nanami|Haruka|O-Ren/i.test(v.name)) || vs[0] || null;
+  } catch (e) {}
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function say(kind, btn) {
+  if (!('speechSynthesis' in window)) { btn.textContent = '此瀏覽器不支援朗讀'; return; }
+  const was = btn.getAttribute('aria-pressed') === 'true';
+  speechSynthesis.cancel();
+  document.querySelectorAll('.play').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  if (was) return;
+  const v = V[S.i]; const text = plain(kind === 'm' ? v.m : v.c.map(x => x[0]).join(''));
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP'; if (jaVoice) u.voice = jaVoice; u.rate = S.rate || 0.8;
+  u.onend = u.onerror = () => btn.setAttribute('aria-pressed', 'false');
+  btn.setAttribute('aria-pressed', 'true');
+  speechSynthesis.speak(u);
+}
+document.addEventListener('click', e => { const b = e.target.closest('.play'); if (b) say(b.dataset.say, b); });
+const go = d => { if (!V.length) return; try { speechSynthesis.cancel(); } catch (e) {} S.i += d; render(); };
 $('prev').onclick = () => go(-1);
 $('next').onclick = () => go(1);
 $('selC').onchange = e => { S.i = V.findIndex(v => v.r.split(':')[0] === e.target.value); render(); };
@@ -228,6 +258,7 @@ $('bModOn').onclick = set('mod', true); $('bModOff').onclick = set('mod', false)
 $('bVocOn').onclick = set('voc', true); $('bVocOff').onclick = set('voc', false);
 for (const [id, v] of [['bThAuto', 'auto'], ['bThLight', 'light'], ['bThDark', 'dark']]) $(id).onclick = () => { S.theme = v; applyTheme(); save(); };
 $('themeBtn').onclick = () => { S.theme = isDark() ? 'light' : 'dark'; applyTheme(); save(); };
+for (const [id, r] of [['bR06', 0.6], ['bR08', 0.8], ['bR10', 1.0]]) $(id).onclick = () => { S.rate = r; render(); };
 $('bFsDn').onclick = () => { S.fs = Math.max(13, S.fs - 1); render(); };
 $('bFsUp').onclick = () => { S.fs = Math.min(26, S.fs + 1); render(); };
 document.addEventListener('keydown', e => {
