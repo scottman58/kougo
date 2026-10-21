@@ -67,6 +67,10 @@ main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-ove
 .ck .z { font-size: .72em; color: var(--muted); line-height: 1.3; max-width: 7em; text-align: center; }
 .vocab { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .86em; line-height: 1.6; }
 .vocab li { padding-left: 1em; text-indent: -1em; }
+.vm { font-family: var(--zh); font-size: .55em; color: var(--shu); font-weight: 700; margin: 0 1px; vertical-align: super; line-height: 1; }
+.tate .vm { vertical-align: baseline; }
+.novocab .vm { display: none; }
+.vocab .vn { color: var(--shu); font-weight: 700; margin-right: 4px; }
 .vocab .w { font-family: var(--jp); color: var(--shu); font-weight: 600; }
 .note { display: flex; gap: 8px; align-items: flex-start; font-size: .86em; line-height: 1.7; background: var(--ai-soft); border-radius: 6px; padding: 8px 10px; }
 .note .tag { background: var(--ai); color: var(--card); border-radius: 3px; padding: 0 6px; font-size: .85em; flex: none; margin-top: .2em; }
@@ -79,6 +83,7 @@ main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-ove
 .tate .mchunks { border-top: 0; border-left: 1px dashed var(--line); padding: 10px 8px; }
 .play { font: inherit; font-size: .8em; line-height: 1; border: 1px solid var(--line); background: var(--card); color: var(--ai); border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .play[aria-pressed="true"] { background: var(--ai); color: var(--card); border-color: var(--ai); }
+.vhint { font-size: .8em; color: var(--shu); margin: 4px 0; line-height: 1.5; }
 .play svg { width: 10px; height: 10px; }
 .origrow { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .tate .play { padding: 10px 4px; }
@@ -190,19 +195,61 @@ async function loadBook(id) {
   $('selC').value = ''; render();
 }
 
+
+const CIRC = n => n <= 20 ? String.fromCharCode(0x245F + n) : n <= 35 ? String.fromCharCode(0x3250 + n - 20) : n <= 50 ? String.fromCharCode(0x32B1 + n - 36) : `(${n})`;
+// find where each vocab word occurs in the plain original; returns [{w,d,pos,end}] sorted by position
+function vocabPlaces(src, vs) {
+  const P = src.replace(/\{([^|}]+)\|[^}]+\}/g, '$1');
+  const used = new Set();
+  const out = vs.map(([w, d], k) => {
+    const parts = w.replace(/[（(].*?[）)]/g, '').split(/[～〜~…・／\/、\sA-Z]+/).filter(Boolean);
+    const cands = [];
+    for (const part of parts.length ? parts : [w]) {
+      for (let L = part.length; L >= 1; L--) {
+        const sub = part.slice(0, L);
+        if (L < 2 && !/[一-鿿々]/.test(sub)) break;
+        cands.push(sub);
+        if (L <= Math.ceil(part.length / 2)) break;
+      }
+    }
+    for (const c of cands) {
+      let from = 0, i;
+      while ((i = P.indexOf(c, from)) >= 0) { if (!used.has(i)) { used.add(i); return { w, d, k, pos: i, end: i + c.length }; } from = i + 1; }
+    }
+    return { w, d, k, pos: Infinity, end: Infinity };
+  });
+  out.sort((a, b) => a.pos - b.pos || a.k - b.k);
+  out.forEach((o, n) => o.no = n + 1);
+  return out;
+}
+// ruby html with circled markers inserted after the token where each vocab match ends
+function rubyMarked(src, places) {
+  const ends = {};
+  places.forEach(o => { if (o.end !== Infinity) (ends[o.end] = ends[o.end] || []).push(o.no); });
+  let html = '', off = 0;
+  const flush = upto => { const ks = Object.keys(ends).map(Number).filter(e => e <= upto).sort((a, b) => a - b); ks.forEach(e => { html += ends[e].map(n => `<span class="vm">${CIRC(n)}</span>`).join(''); delete ends[e]; }); };
+  const re = /\{([^|}]+)\|([^}]+)\}|([^{]+)/g; let m;
+  while ((m = re.exec(src))) {
+    if (m[1]) { html += `<ruby>${esc(m[1])}<rt>${esc(m[2])}</rt></ruby>`; off += m[1].length; flush(off); }
+    else for (const ch of m[3]) { html += esc(ch); off += 1; flush(off); }
+  }
+  flush(Infinity);
+  return html;
+}
 function render() {
   if (!V.length) return;
   S.i = Math.max(0, Math.min(V.length - 1, S.i));
   const v = V[S.i], [c, n] = v.r.split(':');
   const tcy = x => `<span class="tcy">${x}</span>`;
   const refHtml = n === '0' ? (S.tate ? `${tcy(c)}${DATA.unit || '章'} 表題` : `${c}${DATA.unit || '章'} 表題`) : (S.tate ? `${tcy(c)}：${tcy(n)}` : `${c}:${n}`);
+  const OS = v.c.map(x => x[0]).join(''), VP = vocabPlaces(OS, v.v);
   $('card').innerHTML = `
     <div class="ref"><b>${refHtml}</b><span>${esc(DATA.short)}</span></div>
     <p class="tr">${esc(v.t)}</p>
-    <div class="origrow"><button class="play" data-say="o" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 L9 5 L2 9 Z" fill="currentColor"/></svg>朗讀</button><p class="orig">${ruby(v.c.map(x => x[0]).join(''))}</p></div>
+    <div class="origrow"><button class="play" data-say="o" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 L9 5 L2 9 Z" fill="currentColor"/></svg>朗讀</button><p class="orig">${rubyMarked(OS, VP)}</p></div>
     ${v.m ? `<div class="modbox"><button class="play" data-say="m" aria-pressed="false"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1 L9 5 L2 9 Z" fill="currentColor"/></svg>朗讀</button><p class="mod"><span class="lbl">現代語</span>${ruby(v.m)}</p>${v.mc ? `<div class="chunks mchunks">${v.mc.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>` : ''}</div>` : ''}
     <div class="chunks">${v.c.map(([j, z]) => `<div class="ck"><span class="j">${ruby(j)}</span>${ARROW}<span class="z">${esc(z)}</span></div>`).join('')}</div>
-    <ul class="vocab">${v.v.map(([w, d]) => `<li><span class="w">${esc(w)}</span>…${esc(d)}</li>`).join('')}</ul>
+    <ul class="vocab">${VP.map(o => `<li><span class="vn">${CIRC(o.no)}</span><span class="w">${esc(o.w)}</span>…${esc(o.d)}</li>`).join('')}</ul>
     ${v.n ? `<div class="note"><span class="tag">用法</span><span>${esc(v.n)}</span></div>` : ''}`;
   const app = $('app');
   app.classList.toggle('tate', S.tate);
@@ -238,6 +285,13 @@ function say(kind, btn) {
   document.querySelectorAll('.play').forEach(b => b.setAttribute('aria-pressed', 'false'));
   if (was) return;
   const v = V[S.i]; const text = plain(kind === 'm' ? v.m : v.c.map(x => x[0]).join(''));
+  if (!jaVoice) pickVoice();
+  if (!jaVoice && speechSynthesis.getVoices().length) {
+    let h = document.getElementById('vhint');
+    if (!h) { h = document.createElement('p'); h.id = 'vhint'; h.className = 'vhint'; }
+    h.textContent = '這台裝置沒有日文語音，所以會用中文念漢字。Windows：設定 → 時間與語言 → 語音 → 新增語音 → 日本語，裝好後重開瀏覽器。';
+    btn.insertAdjacentElement('afterend', h); return;
+  }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ja-JP'; if (jaVoice) u.voice = jaVoice; u.rate = S.rate || 0.8;
   u.onend = u.onerror = () => btn.setAttribute('aria-pressed', 'false');
